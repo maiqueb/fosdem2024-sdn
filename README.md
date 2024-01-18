@@ -2,6 +2,14 @@
 Demo scripts / config for the "One SDN to rule them all" talk at FOSDEM 2024
 
 ## Simple overlay scenario
+This scenario is ilustrated by the following diagram:
+![](assets/overlay-scenario.png)
+
+We want to create pods in two separate namespaces, communicated over a secondary
+overlay. Two of those pods (one in each namespace) will expose an HTTP
+application on port 9000, while the pod named `podclient` will try to access
+those applications over the secondary network overlay.
+
 The first thing you need to do is to create the namespaces required for this
 demo; execute the following command:
 ```bash
