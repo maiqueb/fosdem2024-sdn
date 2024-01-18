@@ -1,0 +1,104 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: turtle-db-adapter
+  namespace: data-adapter
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+      {
+        "name": "db-access-net",
+        "ips": [ "192.168.200.10/24" ]
+      }
+    ]'
+  labels:
+    role: db-adapter
+spec:
+  containers:
+  - name: db-adapter
+    env:
+    - name: DB_USER
+      value: splinter
+    - name: DB_PASSWORD
+      value: cheese
+    - name: DB_NAME
+      value: turtles
+    - name: DB_IP
+      value: "192.168.200.1"
+    - name: HOST
+      value: "192.168.200.10"
+    - name: PORT
+      value: "9000"
+    image: ghcr.io/maiqueb/rust-turtle-viewer:main
+    ports:
+    - name: webserver
+      protocol: TCP
+      containerPort: 9000
+    securityContext:
+      runAsUser: 1000
+      privileged: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-workload
+  namespace: data-consumer
+spec:
+  running: true
+  template:
+    metadata:
+      labels:
+        role: web-client
+    spec:
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+          - name: default
+            masquerade: {}
+          - name: data-network
+            bridge: {}
+        machine:
+          type: ""
+        resources:
+          requests:
+            memory: 1024M
+      networks:
+      - name: default
+        pod: {}
+      - name: data-network
+        multus:
+          networkName: db-access-net
+      terminationGracePeriodSeconds: 0
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:38
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            networkData: |
+              version: 2
+              ethernets:
+                eth0:
+                  dhcp4: true
+                eth1:
+                  gateway4: 192.168.200.1
+                  addresses: [ 192.168.200.20/24 ]
+            userData: |-
+              #cloud-config
+              password: fedora
+              chpasswd: { expire: False }
+              packages:
+                - postgresql

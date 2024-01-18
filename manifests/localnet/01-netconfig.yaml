@@ -1,0 +1,44 @@
+---
+apiVersion: nmstate.io/v1
+kind: NodeNetworkConfigurationPolicy
+metadata:
+  name: ovs-share-same-gw-bridge
+spec:
+  nodeSelector:
+    node-role.kubernetes.io/worker: ''
+  desiredState:
+    ovn:
+      bridge-mappings:
+      - localnet: data-net
+        bridge: breth0
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: db-access-net
+  namespace: data-adapter
+spec:
+    config: '{
+        "cniVersion": "0.3.1",
+        "name": "data-net",
+        "netAttachDefName": "data-adapter/db-access-net",
+        "topology": "localnet",
+        "type": "ovn-k8s-cni-overlay",
+        "vlanID": 123
+    }'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: db-access-net
+  namespace: data-consumer
+spec:
+    config: '{
+        "cniVersion": "0.3.1",
+        "name": "data-net",
+        "netAttachDefName": "data-consumer/db-access-net",
+        "topology": "localnet",
+        "type": "ovn-k8s-cni-overlay",
+        "vlanID": 123
+    }'
+
