@@ -1,0 +1,31 @@
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: shared-net
+  namespace: tenantblue
+spec:
+    config: '{
+        "cniVersion": "0.3.1",
+        "name": "green-network",
+        "netAttachDefName": "tenantblue/shared-net",
+        "topology": "layer2",
+        "subnets": "192.168.200.0/24",
+        "type": "ovn-k8s-cni-overlay"
+    }'
+---
+apiVersion: k8s.cni.cncf.io/v1
+kind: NetworkAttachmentDefinition
+metadata:
+  name: shared-net
+  namespace: tenantyellow
+spec:
+    config: '{
+        "cniVersion": "0.3.1",
+        "name": "green-network",
+        "netAttachDefName": "tenantyellow/shared-net",
+        "topology": "layer2",
+        "subnets": "192.168.200.0/24",
+        "type": "ovn-k8s-cni-overlay"
+    }'
+

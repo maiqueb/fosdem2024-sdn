@@ -1,0 +1,122 @@
+---
+apiVersion: kubevirt.io/v1
+kind: VirtualMachine
+metadata:
+  name: vm-client
+  namespace: tenantblue
+spec:
+  running: true
+  template:
+    spec:
+      domain:
+        devices:
+          disks:
+            - name: containerdisk
+              disk:
+                bus: virtio
+            - name: cloudinitdisk
+              disk:
+                bus: virtio
+          interfaces:
+          - name: default
+            masquerade: {}
+          - name: shared-network
+            bridge: {}
+        machine:
+          type: ""
+        resources:
+          requests:
+            memory: 1024M
+      networks:
+      - name: default
+        pod: {}
+      - name: shared-network
+        multus:
+          networkName: shared-net
+      terminationGracePeriodSeconds: 0
+      volumes:
+        - name: containerdisk
+          containerDisk:
+            image: quay.io/containerdisks/fedora:38
+        - name: cloudinitdisk
+          cloudInitNoCloud:
+            networkData: |
+              version: 2
+              ethernets:
+                eth0:
+                  dhcp4: true
+                eth1:
+                  addresses: [ 192.168.200.10/24 ]
+            userData: |-
+              #cloud-config
+              password: fedora
+              chpasswd: { expire: False }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: blue-server
+  namespace: tenantblue
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+      {
+        "name": "shared-net",
+        "ips": [ "192.168.200.20/24" ]
+      }
+    ]'
+spec:
+  containers:
+  - name: http-server
+    image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+    args:
+    - "netexec"
+    - "--http-port"
+    - "9000"
+    ports:
+    - name: webserver
+      protocol: TCP
+      containerPort: 9000
+    securityContext:
+      runAsUser: 1000
+      privileged: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: yellow-server
+  namespace: tenantyellow
+  annotations:
+    k8s.v1.cni.cncf.io/networks: '[
+      {
+        "name": "shared-net",
+        "ips": [ "192.168.200.30/24" ]
+      }
+    ]'
+spec:
+  containers:
+  - name: http-server
+    image: k8s.gcr.io/e2e-test-images/agnhost:2.36
+    args:
+    - "netexec"
+    - "--http-port"
+    - "9000"
+    ports:
+    - name: webserver
+      protocol: TCP
+      containerPort: 9000
+    securityContext:
+      runAsUser: 1000
+      privileged: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop: ["ALL"]
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+
