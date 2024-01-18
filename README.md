@@ -87,3 +87,30 @@ kubectl exec -ntenantblue podclient -- curl 192.168.200.7:9000/hostname
 100    13  100    13    0     0  26915      0 --:--:-- --:--:-- --:--:-- 13000
 yellow-server
 ```
+
+## Simple overlay scenario - mixed workloads without IPAM
+We assume you've cleaned up your namespaces from the previous execution; if you
+didn't, please do so now (delete & recreate the namespaces is the fastest way).
+
+Once that is done, provision the manifests for this scenario:
+- [network configuration](manifests/overlay/01-netconfig-no-ipam.yaml)
+- [workloads](manifests/overlay/02-mixed-workloads.yaml)
+
+The difference in this scenario is two-fold:
+1. the network does **not** provide IPAM - this means the user must use static
+IPs when defining the workloads
+2. the scenario consists of both VM and pod worklods in the same platform
+
+But the overall idea is the same; we want to curl both servers from the client
+(this time it is a VM); for that, we will use an helper binary, and log in via
+console:
+
+```bash
+virtctl console vm-client -ntenantblue # the credentials are "fedora" / "fedora"
+Successfully connected to vm-server console. The escape sequence is ^]
+vm-server login: fedora
+Password:
+[fedora@vm-server ~]$ curl 192.168.200.20:9000/hostname
+blue-server[fedora@vm-server ~]$ curl 192.168.200.30:9000/hostname
+yellow-server[fedora@vm-server ~]$
+```
