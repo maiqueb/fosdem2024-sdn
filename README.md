@@ -1,5 +1,75 @@
 # fosdem2024-sdn
-Demo scripts / config for the "One SDN to rule them all" talk at FOSDEM 2024
+Demo scripts / config for the
+[One SDN to connect them all](https://fosdem.org/2024/schedule/event/fosdem-2024-1708-one-sdn-to-connect-them-all)
+talk at FOSDEM 2024.
+
+## Requirements
+- git
+- jq
+- kind
+- [OVN-Kubernetes CNI](https://github.com/ovn-org/ovn-kubernetes/)
+- [Multus-cni](https://github.com/k8snetworkplumbingwg/multus-cni)
+- [kubernetes-nmstate](https://github.com/nmstate/kubernetes-nmstate/)
+- [KubeVirt](https://github.com/kubevirt/kubevirt)
+
+## Setup demo environment
+Refer to the OVN-Kubernetes repo KIND documentation for more details; the gist
+of it is you should clone the OVN-Kubernetes repository, and run their kind
+helper script:
+
+```bash
+git clone git@github.com:ovn-org/ovn-kubernetes.git
+
+cd ovn-kubernetes
+pushd contrib ; ./kind.sh --multi-network-enable -ic; popd
+```
+
+This will get you a running kind cluster (one control plane, and two worker
+nodes) in interconnect mode, configured to use OVN-Kubernetes as the default
+cluster network, configuring the multi-homing OVN-Kubernetes feature gate, and
+deploying `multus-cni` in the cluster.
+
+We will now need to patch the worker nodes, and install `NetworkManager` in
+them (both are requirements for nmstate, which `kubernetes-nmstate` depends on).
+```bash
+for node in "ovn-worker" "ovn-worker2"; do
+    kubectl label node "$node" node-role.kubernetes.io/worker=""
+
+    "$OCI_BIN" exec "$node" bash -c "apt-get update && apt-get install network-manager -y && service NetworkManager start"
+done
+```
+
+Once these steps are done, we can proceed to install kubernetes-nmstate; please
+run the following commands:
+```bash
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/nmstate.io_nmstates.yaml
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/namespace.yaml
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/service_account.yaml
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/role.yaml
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/role_binding.yaml
+kubectl apply -f https://github.com/nmstate/kubernetes-nmstate/releases/download/v0.81.0/operator.yaml
+
+cat <<EOF | kubectl create -f -
+apiVersion: nmstate.io/v1
+kind: NMState
+metadata:
+  name: nmstate
+EOF
+
+kubectl rollout status -w -n nmstate deployment nmstate-webhook --timeout=2m
+```
+
+Finally we will install KubeVirt; for that run the following commands:
+```bash
+export VERSION=$(curl -s https://storage.googleapis.com/kubevirt-prow/release/kubevirt/kubevirt/stable.txt)
+kubectl create -f "https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-operator.yaml"
+kubectl create -f "https://github.com/kubevirt/kubevirt/releases/download/${VERSION}/kubevirt-cr.yaml"
+
+kubectl -n kubevirt wait kv kubevirt --timeout=360s --for condition=Available
+kubevirt.kubevirt.io/kubevirt condition met
+```
+
+Now we have everything we need to proceed with the demo.
 
 ## Simple overlay scenario
 This scenario is ilustrated by the following diagram:
