@@ -306,6 +306,8 @@ kubectl apply -f manifests/localnet/02-mixed-workloads.yaml
 **NOTE:** [this](https://github.com/maiqueb/rust-turtle-viewer) is the repo
 holding the code / image spec for the pod workload
 
+### Accessing the database
+
 Once both the workloads are running (the VM takes a while longer), we can access
 the workloads - let's focus on the VM for now. The pod is pretty much just a
 data adaptation layer.
@@ -366,3 +368,69 @@ Password:
 }
 ```
 
+### Multi network policies
+Finally, we want to use network policies to specify specify how our workloads
+are allowed to communicate with the various network entities deployed on the
+physical network. While network policies are typically a Kubernetes construct
+(thus usually available only for the cluster default network), the
+OVN-Kubernetes plugin implements multi-network policies - and thus the users can
+use the `MultiNetworkPolicy` custom resource to extend this behavior to
+secondary networks.
+
+For this demo, we want to ensure our VM workload can only access the DB data
+that is exposed by the adapter pod. Thus, we want to ensure:
+- the adapter pod can contact the DB over port 5432 (PostgreSQL default port)
+- the adapter pod acceps incoming TCP connection from within the
+192.168.200.0/24 subnet to port 9000
+- the data consumer VM can only contact the adapter pod over in TCP port 9000
+
+The following constraints are depicted in the following diagram:
+![](assets/multi-network-policies.png)
+
+Let's see what happens now when we try to access the DB from the VM workload:
+```bash
+virtctl console vm-workload -ndata-consumer        
+Successfully connected to vm-workload console. The escape sequence is ^]
+[fedora@vm-workload ~]$ PGPASSWORD=cheese PGCONNECT_TIMEOUT=5 psql -h 192.168.200.1 -Usplinter turtles -c "select * from ninja_turtles;"
+psql: error: connection to server at "192.168.200.1", port 5432 failed: timeout expired
+[fedora@vm-workload ~]$ curl -H "Content-type: application/json" 192.168.200.10:9000/turtles | jq
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100   481  100   481    0     0  26922      0 --:--:-- --:--:-- --:--:-- 28294
+{
+  "Ok": [
+    {
+      "user_id": 1,
+      "name": "leonardo",
+      "email": "leo@tmnt.org",
+      "weapon": "swords",
+      "created_on": "2024-01-22T09:52:26.685055"
+    },
+    {
+      "user_id": 2,
+      "name": "donatello",
+      "email": "don@tmnt.org",
+      "weapon": "a stick",
+      "created_on": "2024-01-22T09:52:26.685055"
+    },
+    {
+      "user_id": 3,
+      "name": "michaelangello",
+      "email": "mike@tmnt.org",
+      "weapon": "nunchuks",
+      "created_on": "2024-01-22T09:52:26.685055"
+    },
+    {
+      "user_id": 4,
+      "name": "raphael",
+      "email": "raph@tmnt.org",
+      "weapon": "twin sai",
+      "created_on": "2024-01-22T09:52:26.685055"
+    }
+  ]
+}
+[fedora@vm-workload ~]$ 
+```
+
+As expected, it is now impossible to connect directly to the DB from the VM
+workload; we need to access the data over the adapter pod.
