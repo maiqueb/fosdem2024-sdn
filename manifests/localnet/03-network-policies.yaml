@@ -1,0 +1,52 @@
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: db-adapter
+  namespace: data-adapter
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: data-adapter/db-access-net
+spec:
+  podSelector:
+    matchLabels:
+      role: db-adapter
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 192.168.200.0/24
+    ports:
+    - protocol: TCP
+      port: 9000
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 192.168.200.1/32
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+apiVersion: k8s.cni.cncf.io/v1beta1
+kind: MultiNetworkPolicy
+metadata:
+  name: web-client
+  namespace: data-consumer
+  annotations:
+    k8s.v1.cni.cncf.io/policy-for: data-consumer/db-access-net
+spec:
+  podSelector:
+    matchLabels:
+      role: web-client
+  policyTypes:
+  - Ingress
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 192.168.200.0/24
+    ports:
+    - protocol: TCP
+      port: 9000
+  ingress: []
