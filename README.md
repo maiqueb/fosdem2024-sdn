@@ -206,7 +206,7 @@ network will be used for east/west traffic (i.e. workload communication),
 This is portrayed in the following diagram.
 ![](assets/localnet-scenario-logical-view.png)
 
-Phisically, the traffic on this network will be isolated from the default cluster
+Physically, the traffic on this network will be isolated from the default cluster
 network, since it will be encapsulated on a VLAN while traversing the physical
 wire; this is depicted in the diagram below.
 ![](assets/localnet-scenario.png)
