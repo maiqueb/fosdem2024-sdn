@@ -199,10 +199,16 @@ to a relational DB available on the physical network (i.e. deployed outside
 Kubernetes).
 
 For that we will deploy a secondary localnet network, connected to the physical
-network. The traffic on this network will be isolated from the default cluster
-network, since it will be encapsulated on a VLAN.
+network. Logically, we want to use the cluster default network to connect to
+Kubernetes services (e.g. DNS) and to reach the internet, while the secondary
+network will be used for east/west traffic (i.e. workload communication),
+**and** to access services deployed in the physical network.
+This is portrayed in the following diagram.
+![](assets/localnet-scenario-logical-view.png)
 
-The diagram below depicts the scenario described above.
+Physically, the traffic on this network will be isolated from the default cluster
+network, since it will be encapsulated on a VLAN while traversing the physical
+wire; this is depicted in the diagram below.
 ![](assets/localnet-scenario.png)
 
 Achieving this scenario (... in a real production deployment ...) requires the
